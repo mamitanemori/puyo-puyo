@@ -5,12 +5,16 @@ import { useHighScore } from '@/hooks/useHighScore';
 import { getSatellitePos, getGhostPiece, COLS, ROWS } from '@/lib/puyoLogic';
 import type { PuyoColor } from '@/types/puyo';
 
+// 8-spike star polygon
+const SPIKE_CLIP = 'polygon(50% 3%, 62% 22%, 83% 17%, 78% 39%, 97% 50%, 78% 61%, 83% 83%, 62% 78%, 50% 97%, 38% 78%, 17% 83%, 22% 61%, 3% 50%, 22% 39%, 17% 17%, 38% 22%)';
+const SPIKE_SVG  = '50,3 62,22 83,17 78,39 97,50 78,61 83,83 62,78 50,97 38,78 17,83 22,61 3,50 22,39 17,17 38,22';
+
 const PUYO_STYLES: Record<PuyoColor, { bg: string; glow: string; border: string; solid: string }> = {
-  red:    { bg: 'radial-gradient(circle at 35% 30%, #ffbbbb, #dd1111 60%)', glow: '#ff3333', border: '#ff5555', solid: '#bb0f0f' },
-  blue:   { bg: 'radial-gradient(circle at 35% 30%, #aabbff, #1133dd 60%)', glow: '#3366ff', border: '#5588ff', solid: '#0f28bb' },
-  green:  { bg: 'radial-gradient(circle at 35% 30%, #aaffcc, #11cc22 60%)', glow: '#22cc33', border: '#44ee55', solid: '#0faa1e' },
-  yellow: { bg: 'radial-gradient(circle at 35% 30%, #ffee99, #ee9900 60%)', glow: '#ffbb00', border: '#ffcc33', solid: '#cc8000' },
-  purple: { bg: 'radial-gradient(circle at 35% 30%, #ddaaff, #9911dd 60%)', glow: '#aa22ff', border: '#cc55ff', solid: '#7a0fbb' },
+  red:    { bg: 'radial-gradient(circle at 35% 28%, #ffaaaa, #dd1111 65%)', glow: '#ff3333', border: '#ff5555', solid: '#bb0f0f' },
+  blue:   { bg: 'radial-gradient(circle at 35% 28%, #aabbff, #1133dd 65%)', glow: '#3366ff', border: '#5588ff', solid: '#0f28bb' },
+  green:  { bg: 'radial-gradient(circle at 35% 28%, #aaffbb, #11cc22 65%)', glow: '#22cc33', border: '#44ee55', solid: '#0faa1e' },
+  yellow: { bg: 'radial-gradient(circle at 35% 28%, #ffee99, #ee9900 65%)', glow: '#ffbb00', border: '#ffcc33', solid: '#cc8000' },
+  purple: { bg: 'radial-gradient(circle at 35% 28%, #ddaaff, #9911dd 65%)', glow: '#aa22ff', border: '#cc55ff', solid: '#7a0fbb' },
 };
 
 type CellMode = 'normal' | 'ghost' | 'popping';
@@ -27,36 +31,35 @@ function Puyo({ color, mode = 'normal', connections }: {
   if (mode === 'ghost') {
     return (
       <svg viewBox="0 0 100 100" className="w-full h-full">
-        <circle cx="50" cy="50" r="43" fill="none" stroke={s.border} strokeWidth="2" strokeDasharray="5 3" opacity="0.5" />
+        <polygon points={SPIKE_SVG} fill="none" stroke={s.border} strokeWidth="2.5" strokeDasharray="5 3" opacity="0.45" />
       </svg>
     );
   }
 
-  // Connectors span: from center (50%) out past inset + grid gap + neighbor inset
-  // inset=8% each side, gap=1px → bridge needs calc(-17% - 1px) extension
+  // Spike tips reach ~3% from cell edge, grid gap=1px.
+  // Bridges use the spike base width (~24%) and extend calc(-6% - 1px) past cell edge
+  // to visually connect the opposing spike tips of adjacent same-color puyos.
   return (
     <div
-      className={`w-full h-full relative select-none ${mode === 'popping' ? 'puyo-popping' : ''}`}
-      style={{ filter: `drop-shadow(0 0 6px ${s.glow}bb) drop-shadow(0 1px 3px rgba(0,0,0,0.6))`, transformOrigin: 'center' }}
+      className="w-full h-full relative"
+      style={{ filter: `drop-shadow(0 0 5px ${s.glow}bb) drop-shadow(0 1px 3px rgba(0,0,0,0.6))` }}
     >
-      {/* Connection bridges */}
-      {cn.top    && <div className="absolute" style={{ zIndex: 0, top: 'calc(-17% - 1px)', bottom: '50%', left: '30%', right: '30%', background: s.solid, borderRadius: '4px 4px 0 0' }} />}
-      {cn.bottom && <div className="absolute" style={{ zIndex: 0, bottom: 'calc(-17% - 1px)', top: '50%', left: '30%', right: '30%', background: s.solid, borderRadius: '0 0 4px 4px' }} />}
-      {cn.left   && <div className="absolute" style={{ zIndex: 0, left: 'calc(-17% - 1px)', right: '50%', top: '30%', bottom: '30%', background: s.solid, borderRadius: '4px 0 0 4px' }} />}
-      {cn.right  && <div className="absolute" style={{ zIndex: 0, right: 'calc(-17% - 1px)', left: '50%', top: '30%', bottom: '30%', background: s.solid, borderRadius: '0 4px 4px 0' }} />}
+      {/* Connection bridges (behind spike, not clipped) */}
+      {cn.top    && <div className="absolute" style={{ zIndex: 0, top: 'calc(-6% - 1px)', bottom: '55%', left: '38%', right: '38%', background: s.solid, borderRadius: '3px 3px 0 0' }} />}
+      {cn.bottom && <div className="absolute" style={{ zIndex: 0, bottom: 'calc(-6% - 1px)', top: '55%', left: '38%', right: '38%', background: s.solid, borderRadius: '0 0 3px 3px' }} />}
+      {cn.left   && <div className="absolute" style={{ zIndex: 0, left: 'calc(-6% - 1px)', right: '55%', top: '38%', bottom: '38%', background: s.solid, borderRadius: '3px 0 0 3px' }} />}
+      {cn.right  && <div className="absolute" style={{ zIndex: 0, right: 'calc(-6% - 1px)', left: '55%', top: '38%', bottom: '38%', background: s.solid, borderRadius: '0 3px 3px 0' }} />}
 
-      {/* Main circle (inset 8% for visible gap → bridge appears between circles) */}
+      {/* Spiky main puyo */}
       <div
-        className="absolute"
-        style={{ zIndex: 1, inset: '8%', borderRadius: '50%', background: s.bg }}
+        className={`w-full h-full relative select-none ${mode === 'popping' ? 'puyo-popping' : ''}`}
+        style={{ clipPath: SPIKE_CLIP, background: s.bg, transformOrigin: 'center', zIndex: 1 }}
       >
-        {/* Shine */}
-        <div className="absolute" style={{ top: '10%', left: '15%', width: '34%', height: '24%', background: 'radial-gradient(ellipse, rgba(255,255,255,0.75) 0%, transparent 80%)', borderRadius: '50%', transform: 'rotate(-20deg)' }} />
-        {/* Eyes */}
-        <div className="absolute rounded-full bg-black" style={{ top: '42%', left: '20%',  width: '22%', height: '22%' }} />
-        <div className="absolute rounded-full bg-black" style={{ top: '42%', right: '20%', width: '22%', height: '22%' }} />
-        <div className="absolute rounded-full bg-white" style={{ top: '44%', left: '22%',  width: '10%', height: '10%' }} />
-        <div className="absolute rounded-full bg-white" style={{ top: '44%', right: '22%', width: '10%', height: '10%' }} />
+        <div className="absolute" style={{ top: '12%', left: '22%', width: '30%', height: '22%', background: 'radial-gradient(ellipse, rgba(255,255,255,0.55) 0%, transparent 80%)', borderRadius: '50%', transform: 'rotate(-20deg)' }} />
+        <div className="absolute rounded-full bg-black" style={{ top: '36%', left: '24%',  width: '18%', height: '18%' }} />
+        <div className="absolute rounded-full bg-black" style={{ top: '36%', right: '24%', width: '18%', height: '18%' }} />
+        <div className="absolute rounded-full bg-white" style={{ top: '38%', left: '26%',  width: '8%',  height: '8%'  }} />
+        <div className="absolute rounded-full bg-white" style={{ top: '38%', right: '26%', width: '8%',  height: '8%'  }} />
       </div>
     </div>
   );
