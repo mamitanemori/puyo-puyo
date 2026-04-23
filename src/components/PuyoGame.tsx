@@ -3,50 +3,66 @@ import { useEffect, useRef, useState } from 'react';
 import { usePuyoGame } from '@/hooks/usePuyoGame';
 import { useHighScore } from '@/hooks/useHighScore';
 import { getSatellitePos, getGhostPiece, COLS, ROWS } from '@/lib/puyoLogic';
-import type { Cell, PuyoColor } from '@/types/puyo';
+import type { PuyoColor } from '@/types/puyo';
 
-// 8-spike star polygon (outer r=47, inner r=30, center 50,50)
-const SPIKE_CLIP = 'polygon(50% 3%, 62% 22%, 83% 17%, 78% 39%, 97% 50%, 78% 61%, 83% 83%, 62% 78%, 50% 97%, 38% 78%, 17% 83%, 22% 61%, 3% 50%, 22% 39%, 17% 17%, 38% 22%)';
-const SPIKE_SVG  = '50,3 62,22 83,17 78,39 97,50 78,61 83,83 62,78 50,97 38,78 17,83 22,61 3,50 22,39 17,17 38,22';
-
-const PUYO_STYLES: Record<PuyoColor, { bg: string; glow: string; border: string }> = {
-  red:    { bg: 'radial-gradient(circle at 35% 28%, #ffaaaa, #dd1111 65%)', glow: '#ff3333', border: '#ff5555' },
-  blue:   { bg: 'radial-gradient(circle at 35% 28%, #aabbff, #1133dd 65%)', glow: '#3366ff', border: '#5588ff' },
-  green:  { bg: 'radial-gradient(circle at 35% 28%, #aaffbb, #11cc22 65%)', glow: '#22cc33', border: '#44ee55' },
-  yellow: { bg: 'radial-gradient(circle at 35% 28%, #ffee99, #ee9900 65%)', glow: '#ffbb00', border: '#ffcc33' },
-  purple: { bg: 'radial-gradient(circle at 35% 28%, #ddaaff, #9911dd 65%)', glow: '#aa22ff', border: '#cc55ff' },
+const PUYO_STYLES: Record<PuyoColor, { bg: string; glow: string; border: string; solid: string }> = {
+  red:    { bg: 'radial-gradient(circle at 35% 30%, #ffbbbb, #dd1111 60%)', glow: '#ff3333', border: '#ff5555', solid: '#bb0f0f' },
+  blue:   { bg: 'radial-gradient(circle at 35% 30%, #aabbff, #1133dd 60%)', glow: '#3366ff', border: '#5588ff', solid: '#0f28bb' },
+  green:  { bg: 'radial-gradient(circle at 35% 30%, #aaffcc, #11cc22 60%)', glow: '#22cc33', border: '#44ee55', solid: '#0faa1e' },
+  yellow: { bg: 'radial-gradient(circle at 35% 30%, #ffee99, #ee9900 60%)', glow: '#ffbb00', border: '#ffcc33', solid: '#cc8000' },
+  purple: { bg: 'radial-gradient(circle at 35% 30%, #ddaaff, #9911dd 60%)', glow: '#aa22ff', border: '#cc55ff', solid: '#7a0fbb' },
 };
 
 type CellMode = 'normal' | 'ghost' | 'popping';
+type Connections = { top: boolean; right: boolean; bottom: boolean; left: boolean };
 
-function Puyo({ color, mode = 'normal' }: { color: PuyoColor; mode?: CellMode }) {
+function Puyo({ color, mode = 'normal', connections }: {
+  color: PuyoColor;
+  mode?: CellMode;
+  connections?: Connections;
+}) {
   const s = PUYO_STYLES[color];
+  const cn = connections ?? { top: false, right: false, bottom: false, left: false };
+
   if (mode === 'ghost') {
     return (
       <svg viewBox="0 0 100 100" className="w-full h-full">
-        <polygon points={SPIKE_SVG} fill="none" stroke={s.border} strokeWidth="2.5" strokeDasharray="5 3" opacity="0.45" />
+        <circle cx="50" cy="50" r="43" fill="none" stroke={s.border} strokeWidth="2" strokeDasharray="5 3" opacity="0.5" />
       </svg>
     );
   }
+
+  // Connectors span: from center (50%) out past inset + grid gap + neighbor inset
+  // inset=8% each side, gap=1px → bridge needs calc(-17% - 1px) extension
   return (
-    <div className="w-full h-full" style={{ filter: `drop-shadow(0 0 5px ${s.glow}bb) drop-shadow(0 1px 3px rgba(0,0,0,0.6))` }}>
+    <div
+      className={`w-full h-full relative select-none ${mode === 'popping' ? 'puyo-popping' : ''}`}
+      style={{ filter: `drop-shadow(0 0 6px ${s.glow}bb) drop-shadow(0 1px 3px rgba(0,0,0,0.6))`, transformOrigin: 'center' }}
+    >
+      {/* Connection bridges */}
+      {cn.top    && <div className="absolute" style={{ zIndex: 0, top: 'calc(-17% - 1px)', bottom: '50%', left: '30%', right: '30%', background: s.solid, borderRadius: '4px 4px 0 0' }} />}
+      {cn.bottom && <div className="absolute" style={{ zIndex: 0, bottom: 'calc(-17% - 1px)', top: '50%', left: '30%', right: '30%', background: s.solid, borderRadius: '0 0 4px 4px' }} />}
+      {cn.left   && <div className="absolute" style={{ zIndex: 0, left: 'calc(-17% - 1px)', right: '50%', top: '30%', bottom: '30%', background: s.solid, borderRadius: '4px 0 0 4px' }} />}
+      {cn.right  && <div className="absolute" style={{ zIndex: 0, right: 'calc(-17% - 1px)', left: '50%', top: '30%', bottom: '30%', background: s.solid, borderRadius: '0 4px 4px 0' }} />}
+
+      {/* Main circle (inset 8% for visible gap → bridge appears between circles) */}
       <div
-        className={`w-full h-full relative select-none ${mode === 'popping' ? 'puyo-popping' : ''}`}
-        style={{ clipPath: SPIKE_CLIP, background: s.bg, transformOrigin: 'center' }}
+        className="absolute"
+        style={{ zIndex: 1, inset: '8%', borderRadius: '50%', background: s.bg }}
       >
-        <div className="absolute" style={{ top: '12%', left: '22%', width: '30%', height: '22%', background: 'radial-gradient(ellipse, rgba(255,255,255,0.55) 0%, transparent 80%)', borderRadius: '50%', transform: 'rotate(-20deg)' }} />
-        <div className="absolute rounded-full bg-black" style={{ top: '36%', left: '24%',  width: '18%', height: '18%' }} />
-        <div className="absolute rounded-full bg-black" style={{ top: '36%', right: '24%', width: '18%', height: '18%' }} />
-        <div className="absolute rounded-full bg-white" style={{ top: '38%', left: '26%',  width: '8%',  height: '8%'  }} />
-        <div className="absolute rounded-full bg-white" style={{ top: '38%', right: '26%', width: '8%',  height: '8%'  }} />
+        {/* Shine */}
+        <div className="absolute" style={{ top: '10%', left: '15%', width: '34%', height: '24%', background: 'radial-gradient(ellipse, rgba(255,255,255,0.75) 0%, transparent 80%)', borderRadius: '50%', transform: 'rotate(-20deg)' }} />
+        {/* Eyes */}
+        <div className="absolute rounded-full bg-black" style={{ top: '42%', left: '20%',  width: '22%', height: '22%' }} />
+        <div className="absolute rounded-full bg-black" style={{ top: '42%', right: '20%', width: '22%', height: '22%' }} />
+        <div className="absolute rounded-full bg-white" style={{ top: '44%', left: '22%',  width: '10%', height: '10%' }} />
+        <div className="absolute rounded-full bg-white" style={{ top: '44%', right: '22%', width: '10%', height: '10%' }} />
       </div>
     </div>
   );
 }
 
 // ── Layout hook ──────────────────────────────────────────────────────────────
-// Returns cell size and whether to use mobile (vertical) layout.
-// Starts with desktop defaults to avoid SSR hydration mismatch.
 function useLayout() {
   const [layout, setLayout] = useState({ cell: 46, mobile: false });
 
@@ -57,46 +73,67 @@ function useLayout() {
       const portrait = vh >= vw;
 
       if (vw < 600 && portrait) {
-        // Mobile portrait: vertical layout
-        // Reserved: stats(52px) + controls(108px) + padding(28px) = 188px
         const byW = Math.floor((vw - 8) / COLS);
         const byH = Math.floor((vh - 188) / ROWS);
         return { cell: Math.max(24, Math.min(byW, byH)), mobile: true };
       } else {
-        // Desktop or landscape: horizontal layout (board + side panel 180px)
         const byH = Math.floor((vh - 32) / ROWS);
         const byW = Math.floor((vw - 212) / COLS);
         return { cell: Math.max(24, Math.min(46, byW, byH)), mobile: false };
       }
     }
     setLayout(compute());
-    window.addEventListener('resize', () => setLayout(compute()));
-    return () => window.removeEventListener('resize', () => setLayout(compute()));
+    const handler = () => setLayout(compute());
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
   }, []);
 
   return layout;
 }
 
 // ── Board renderer ────────────────────────────────────────────────────────────
-function GameBoard({ display, cell }: { display: ({ color: PuyoColor; mode: CellMode } | null)[][]; cell: number }) {
+type DisplayCell = { color: PuyoColor; mode: CellMode } | null;
+
+function getConnections(display: DisplayCell[][], cellData: DisplayCell, x: number, y: number): Connections | undefined {
+  if (!cellData || cellData.mode === 'ghost') return undefined;
+  const same = (dy: number, dx: number) => {
+    const ny = y + dy, nx = x + dx;
+    if (ny < 0 || ny >= ROWS || nx < 0 || nx >= COLS) return false;
+    const n = display[ny][nx];
+    return n != null && n.color === cellData.color && n.mode !== 'ghost';
+  };
+  return { top: same(-1, 0), bottom: same(1, 0), left: same(0, -1), right: same(0, 1) };
+}
+
+function GameBoard({ display, cell }: { display: DisplayCell[][]; cell: number }) {
   return (
     <div style={{
       display: 'grid',
       gridTemplateColumns: `repeat(${COLS}, ${cell}px)`,
       gridTemplateRows: `repeat(${ROWS}, ${cell}px)`,
       gap: '1px',
-      background: 'linear-gradient(180deg, #0c0a1a 0%, #080614 100%)',
+      background: 'linear-gradient(180deg, #0a0818 0%, #060510 100%)',
     }}>
       {display.map((row, y) =>
-        row.map((cell_data, x) => (
+        row.map((cellData, x) => (
           <div
             key={`${y}-${x}`}
             style={{
-              width: cell, height: cell, padding: Math.max(2, Math.floor(cell * 0.06)),
-              background: (y + x) % 2 === 0 ? 'rgba(255,255,255,0.015)' : 'transparent',
+              width: cell, height: cell,
+              position: 'relative',
+              overflow: 'visible',
+              background: !cellData
+                ? ((y + x) % 2 === 0 ? 'rgba(255,255,255,0.018)' : 'rgba(0,0,0,0)')
+                : 'transparent',
             }}
           >
-            {cell_data && <Puyo color={cell_data.color} mode={cell_data.mode} />}
+            {cellData && (
+              <Puyo
+                color={cellData.color}
+                mode={cellData.mode}
+                connections={getConnections(display, cellData, x, y)}
+              />
+            )}
           </div>
         ))
       )}
@@ -164,7 +201,6 @@ export function PuyoGame() {
 
   // Build display board
   const poppingSet = new Set(poppingCells.map(c => `${c.x},${c.y}`));
-  type DisplayCell = { color: PuyoColor; mode: CellMode } | null;
   const display: DisplayCell[][] = board.map((row, y) =>
     row.map((c, x): DisplayCell => c ? { color: c, mode: poppingSet.has(`${x},${y}`) ? 'popping' : 'normal' } : null)
   );
@@ -183,9 +219,9 @@ export function PuyoGame() {
   }
 
   const isActive = phase === 'falling' || phase === 'popping';
-  const boardW = cell * COLS + (COLS - 1); // board pixel width incl. gaps
+  const boardW = cell * COLS + (COLS - 1);
 
-  // ── Overlays (shared) ────────────────────────────────────────────────────
+  // ── Overlays ─────────────────────────────────────────────────────────────
   const overlays = (
     <>
       {paused && (
@@ -254,7 +290,6 @@ export function PuyoGame() {
               <span className="text-purple-400 font-mono font-bold">{maxChain}</span>
             </div>
           )}
-          {/* Next piece */}
           <div className="flex flex-col items-center gap-0.5">
             <span className="text-gray-500 text-[9px] tracking-widest uppercase">Next</span>
             <div className="flex gap-1">
@@ -265,7 +300,6 @@ export function PuyoGame() {
               ))}
             </div>
           </div>
-          {/* Pause button */}
           {isActive && (
             <button onClick={togglePause} className="text-gray-400 hover:text-white text-lg px-1 active:scale-90 transition-transform">
               {paused ? '▶' : '⏸'}
@@ -323,7 +357,7 @@ export function PuyoGame() {
             <div className="text-[10px] font-semibold tracking-widest text-gray-500 uppercase mb-2">NEXT</div>
             <div className="flex flex-col gap-1.5 items-start mt-1">
               {nextColors.map((color, i) => (
-                <div key={i} style={{ width: 34, height: 34, padding: 2 }}><Puyo color={color} /></div>
+                <div key={i} style={{ width: 34, height: 34 }}><Puyo color={color} /></div>
               ))}
             </div>
           </div>
