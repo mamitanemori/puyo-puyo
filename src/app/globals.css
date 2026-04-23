@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+:root {
+  --background: #030712;
+  --foreground: #f9fafb;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans, Arial, sans-serif);
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── ぷよ消去アニメーション ── */
+@keyframes puyo-pop {
+  0%   { transform: scale(1);    filter: brightness(1);   opacity: 1; }
+  20%  { transform: scale(1.35); filter: brightness(2.8); opacity: 1; }
+  55%  { transform: scale(1.15); filter: brightness(2);   opacity: 0.8; }
+  85%  { transform: scale(0.5);  filter: brightness(1.2); opacity: 0.4; }
+  100% { transform: scale(0);    filter: brightness(1);   opacity: 0; }
+}
+
+.puyo-popping {
+  animation: puyo-pop 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97) forwards;
+  pointer-events: none;
+}
+
+/* ── チェーン数フラッシュ ── */
+@keyframes chain-flash {
+  0%, 100% { opacity: 1;   transform: scale(1); }
+  50%       { opacity: 0.6; transform: scale(1.1); }
+}
+
+.chain-flash {
+  animation: chain-flash 0.5s ease-in-out infinite;
+}
